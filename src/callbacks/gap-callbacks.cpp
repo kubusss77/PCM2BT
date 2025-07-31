@@ -5,6 +5,9 @@
 #include <string.h>
 #include "setup/settings.h"
 
+#include "freertos/FreeRTOS.h"
+#include "tasks/i2s_task.h"
+
 
 const char* gap_event_name(esp_bt_gap_cb_event_t event) {
     switch(event) {
@@ -81,6 +84,9 @@ void gap_callback(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t *param) {
                     ESP_LOGI("gap_callback", "Połączono z: %s (%s)", dev_name, dev_mac_addr);
                     ESP_ERROR_CHECK(esp_bt_gap_cancel_discovery());
                     connected = true;
+
+                    // Start I2S task after successful connection
+                    xTaskCreate(i2s_task, "i2s_task", 4096, NULL, 5, NULL);
                 } else {
                     ESP_LOGE("gap_callback", "Failed to connect to %s (%s)", dev_name, dev_mac_addr);
                 }
@@ -118,6 +124,22 @@ void gap_callback(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t *param) {
             break;
         case ESP_BT_GAP_RMT_SRVCS_EVT:
             ESP_LOGI("gap_callback", "Remote services event");
+            break;
+        case ESP_BT_GAP_RMT_SRVC_REC_EVT:
+            ESP_LOGI("gap_callback", "Remote service record event");
+            break;
+        case ESP_BT_GAP_REMOVE_BOND_DEV_COMPLETE_EVT:   
+            ESP_LOGI("gap_callback", "Bond device removed");
+            break;
+        case ESP_BT_GAP_QOS_CMPL_EVT:
+            ESP_LOGI("gap_callback", "QoS complete event");
+            break;
+        case ESP_BT_GAP_ACL_CONN_CMPL_STAT_EVT:
+            ESP_LOGI("gap_callback", "ACL connection complete status event");
+            break;
+        case ESP_BT_GAP_ACL_DISCONN_CMPL_STAT_EVT:
+            connected = false;
+            ESP_LOGI("gap_callback", "ACL disconnection complete status event");
             break;
         default:
             ESP_LOGI("gap_callback", "Unhandled GAP event: %d", event);

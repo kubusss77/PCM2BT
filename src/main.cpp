@@ -14,18 +14,29 @@
 #include "esp_a2dp_api.h"
 #include "esp_gap_bt_api.h"
 #include "callbacks/a2dp-callbacks.h"
+#include "driver/i2s_std.h"
 #include <string.h>
+#include "tasks/i2s_task.h"
 
 
 extern "C" void app_main() {
     //esp_log_level_set("*", ESP_LOG_DEBUG);
-    esp_log_level_set("a2dp_data_callback", ESP_LOG_DEBUG);
+    //esp_log_level_set("a2dp_data_callback", ESP_LOG_DEBUG);
 
-    vTaskDelay(pdMS_TO_TICKS(5000));
+    vTaskDelay(pdMS_TO_TICKS(1000));
+
+    if (i2s_buffer_mutex == NULL) {
+        i2s_buffer_mutex = xSemaphoreCreateMutex();
+        if (i2s_buffer_mutex == NULL) {
+            ESP_LOGE("main", "Failed to create I2S buffer mutex");
+            return;
+        }
+    }
     ESP_LOGI("main", "Start PCM2BT");
 
-    if (init_adc() != ESP_OK) {
-        ESP_LOGE("main", "ADC initialization failed");
+
+    if (init_i2s() != ESP_OK) {
+        ESP_LOGE("main", "I2S initialization failed");
         return;
     }
 
@@ -52,7 +63,8 @@ extern "C" void app_main() {
     }
 
 
-    while (1) {
+
+    while (true) {
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }

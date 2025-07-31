@@ -3,8 +3,9 @@
 #include "esp_log.h"
 #include "esp_err.h"
 
-#include "soc/soc_caps.h" // Min/Max sample frequency
-#include "esp_adc/adc_continuous.h"
+#include "driver/i2s_std.h"
+#include "driver/i2s_pdm.h"
+#include "driver/i2s_tdm.h"
 
 #include "esp_bt.h" // BT controller
 #include "nvs.h"
@@ -16,50 +17,31 @@
 
 
 
-esp_err_t init_adc() {
-    ESP_LOGI("init_adc","Initializing ADC in continuous mode...");
+esp_err_t init_i2s() {
+    i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(i2s_port, I2S_ROLE_MASTER);
+    i2s_rx_handle = NULL;
+    ESP_ERROR_CHECK(i2s_new_channel(&chan_cfg, NULL,&i2s_rx_handle));
 
-    ESP_LOGD("init_adc"," Min sample freq: %d", SOC_ADC_SAMPLE_FREQ_THRES_LOW);
-    ESP_LOGD("init_adc"," Max sample freq: %d", SOC_ADC_SAMPLE_FREQ_THRES_HIGH);
-
-    adc_continuous_handle_cfg_t adc_handle_config = {
-        .max_store_buf_size = 1024 * sizeof(int16_t),
-        .conv_frame_size = 1024 * sizeof(int16_t),
-        .flags = 0,
+    i2s_std_config_t std_cfg = {
+        .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(i2s_sample_rate),
+        .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_32BIT, I2S_SLOT_MODE_STEREO),
+        .gpio_cfg = {
+            .mclk = GPIO_NUM_0,
+            .bclk = i2s_bck_io,
+            .ws = i2s_ws_io,
+            .dout = I2S_GPIO_UNUSED,
+            .din = i2s_di_io,
+            .invert_flags = {
+                .mclk_inv = false,
+                .bclk_inv = false,
+                .ws_inv = false,
+            },
+        },
     };
-    ESP_LOGD("init_adc","Creating ADC handle");
-    if (adc_continuous_new_handle(&adc_handle_config, &adc_handle) != ESP_OK) {
-        ESP_LOGE("init_adc", "Failed to create ADC handle");
-        return ESP_FAIL;
-    }
 
-    adc_digi_pattern_config_t adc_pattern = {
-        .atten = ADC_ATTEN_DB_12,
-        .channel = ADC_CHANNEL_0,
-        .unit = ADC_UNIT_1,
-        .bit_width = ADC_BITWIDTH_12,
-    };
-    adc_continuous_config_t adc_config = {
-        .pattern_num = 1,
-        .adc_pattern = &adc_pattern,
-        .sample_freq_hz = 32000,
-        .conv_mode = ADC_CONV_SINGLE_UNIT_1,
-        .format = ADC_DIGI_OUTPUT_FORMAT_TYPE1,
-    };
-    ESP_LOGD("init_adc","Configuring ADC in continuous mode");
-    if (adc_continuous_config(adc_handle, &adc_config) != ESP_OK) {
-        ESP_LOGE("init_adc", "Failed to configure ADC");
-        return ESP_FAIL;
-    }
+    ESP_ERROR_CHECK(i2s_channel_init_std_mode(i2s_rx_handle, &std_cfg));
+    ESP_ERROR_CHECK(i2s_channel_enable(i2s_rx_handle));
 
-    ESP_LOGD("init_adc","Starting ADC in continuous mode");
-    if (adc_continuous_start(adc_handle) != ESP_OK) {
-        ESP_LOGE("init_adc", "Failed to start ADC");
-        return ESP_FAIL;
-    }
-    
-
-    ESP_LOGI("init_adc","ADC configured and started successfully");
     return ESP_OK;
 }
 
